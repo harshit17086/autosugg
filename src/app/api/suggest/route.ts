@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = `Generate up to 8 short search autocomplete suggestions in ${languageName} for the partial query: "${query}". Return ONLY a JSON array of strings, no extra text.`;
 
-    const response = await axios.post(
+    const response = await axios.post<unknown>(
       "https://ai.potential.com/chatbot/",
       {
         system:
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    const data = response.data;
+    const data: unknown = response.data;
     const raw = typeof data === "string" ? data : JSON.stringify(data);
 
     // Log prompt and raw response for debugging
@@ -70,10 +70,8 @@ export async function POST(req: NextRequest) {
     if (typeof data === "string") {
       suggestions = tryParseArrayFromString(data) ?? [];
     } else if (data && typeof data === "object") {
-      const candidate =
-        (data as any).response ??
-        (data as any).suggestions ??
-        (data as any).result;
+      const obj = data as Record<string, unknown>;
+      const candidate = obj.response ?? obj.suggestions ?? obj.result;
       if (typeof candidate === "string") {
         suggestions = tryParseArrayFromString(candidate) ?? [];
       } else if (arrayOfStrings(candidate)) {
@@ -81,7 +79,7 @@ export async function POST(req: NextRequest) {
       }
       // Last resort: scan values
       if (suggestions.length === 0) {
-        for (const v of Object.values(data as Record<string, unknown>)) {
+        for (const v of Object.values(obj)) {
           if (arrayOfStrings(v)) {
             suggestions = v;
             break;
@@ -123,8 +121,9 @@ export async function POST(req: NextRequest) {
       { suggestions },
       { headers: { "cache-control": "no-store, no-cache, must-revalidate" } }
     );
-  } catch (err: any) {
-    const message = err?.message || "Failed to fetch suggestions";
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : "Failed to fetch suggestions";
     return Response.json(
       { suggestions: [], error: message },
       { status: 500, headers: { "cache-control": "no-store" } }
