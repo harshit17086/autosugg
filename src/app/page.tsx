@@ -1,103 +1,205 @@
-import Image from "next/image";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
+const languages = [
+  { code: "en", label: "English", full: "English" },
+  { code: "hi", label: "हिन्दी", full: "Hindi" },
+  { code: "bn", label: "বাংলা", full: "Bengali" },
+  { code: "ta", label: "தமிழ்", full: "Tamil" },
+  { code: "te", label: "తెలుగు", full: "Telugu" },
+  { code: "mr", label: "मराठी", full: "Marathi" },
+  { code: "gu", label: "ગુજરાતી", full: "Gujarati" },
+  { code: "kn", label: "ಕನ್ನಡ", full: "Kannada" },
+  { code: "ml", label: "മലയാളം", full: "Malayalam" },
+  { code: "pa", label: "ਪੰਜਾਬੀ", full: "Punjabi" },
+];
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const [lang, setLang] = useState("en");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState<number>(-1);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Fetch suggestions with a small debounce
+  useEffect(() => {
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      const term = q.trim();
+      if (!term) {
+        setSuggestions([]);
+        setOpen(false);
+        setHighlight(-1);
+        return;
+      }
+      try {
+        const fullName = languages.find((l) => l.code === lang)?.full || lang;
+        const payload = { q: term, lang: fullName };
+        const res = await fetch("/api/suggest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        console.log("[client] suggest payload:", payload);
+        console.log("[client] suggest response:", data);
+        const list: string[] = Array.isArray(data?.suggestions)
+          ? data.suggestions
+          : [];
+        setSuggestions(list);
+        setOpen(list.length > 0);
+        setHighlight(-1);
+      } catch (_) {
+        // ignore errors and close dropdown
+        setOpen(false);
+      }
+    }, 300);
+    return () => {
+      controller.abort();
+      clearTimeout(t);
+    };
+  }, [q, lang]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("click", onClick);
+    return () => window.removeEventListener("click", onClick);
+  }, []);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams({ q, lang });
+    router.push(`/home?${params.toString()}`);
+  };
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-4">
+      <div className="w-full max-w-2xl space-y-8">
+        <div className="text-center">
+          <h1 className="text-5xl font-semibold tracking-tight">acchi</h1>
+          <p className="mt-2 text-sm text-gray-500">
+            Search the web in your language
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div ref={containerRef} className="relative">
+            <div className="flex items-stretch gap-2 rounded-full border border-gray-300 bg-white px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 dark:bg-zinc-900 dark:border-zinc-700">
+              <input
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onFocus={() => setOpen(suggestions.length > 0)}
+                onKeyDown={(e) => {
+                  if (!open || suggestions.length === 0) return;
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlight((h) => (h + 1) % suggestions.length);
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlight(
+                      (h) => (h - 1 + suggestions.length) % suggestions.length
+                    );
+                  } else if (e.key === "Enter") {
+                    if (highlight >= 0) {
+                      e.preventDefault();
+                      const chosen = suggestions[highlight];
+                      setQ(chosen);
+                      setOpen(false);
+                    }
+                  } else if (e.key === "Escape") {
+                    setOpen(false);
+                  }
+                }}
+                placeholder="Search..."
+                className="flex-1 bg-transparent outline-none text-base"
+                aria-label="Search"
+              />
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value)}
+                className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm dark:bg-zinc-800 dark:border-zinc-700"
+                aria-label="Language"
+              >
+                {languages.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {open && suggestions.length > 0 && (
+              <ul className="absolute left-0 right-0 z-10 mt-2 max-h-80 overflow-auto rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                {suggestions.map((s, idx) => (
+                  <li
+                    key={idx}
+                    className={`cursor-pointer rounded px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800 ${
+                      idx === highlight ? "bg-gray-100 dark:bg-zinc-800" : ""
+                    }`}
+                    onMouseEnter={() => setHighlight(idx)}
+                    onMouseLeave={() => setHighlight(-1)}
+                    onMouseDown={(e) => {
+                      // prevent input from losing focus before click
+                      e.preventDefault();
+                    }}
+                    onClick={() => {
+                      setQ(s);
+                      setOpen(false);
+                    }}
+                  >
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="submit"
+              className="rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+            >
+              Search
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setQ("");
+              }}
+              className="rounded bg-gray-100 px-4 py-2 text-sm hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+            >
+              Clear
+            </button>
+          </div>
+        </form>
+
+        <div className="text-center text-sm text-gray-500">
+          Languages:{" "}
+          {languages.map((l, i) => (
+            <button
+              key={l.code}
+              onClick={() => setLang(l.code)}
+              className={`mx-1 underline-offset-2 hover:underline ${
+                lang === l.code ? "font-medium text-blue-600" : ""
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </main>
   );
 }
