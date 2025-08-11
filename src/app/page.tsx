@@ -87,7 +87,7 @@ export default function Home() {
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-2xl space-y-8">
         <div className="text-center">
-          <h1 className="text-5xl font-semibold tracking-tight">acchi</h1>
+          <h1 className="text-5xl font-semibold tracking-tight">Auto Text Generation</h1>
           <p className="mt-2 text-sm text-gray-500">
             Search the web in your language
           </p>
